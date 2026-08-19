@@ -1457,7 +1457,7 @@ async function playAllTricks() {
 
 function computeRoundScoring() {
   const declarer = game.players[game.declarerIndex];
-  const bid = game.contractBid;
+  const bid = game.players.length == 2 ? game.contractBid - 2 : game.contractBid;
   const tricksWon = declarer.tricksWonCount;
   const made = tricksWon >= bid;
   const mult = game.config.scoreMultiplier || 1;
@@ -1673,7 +1673,7 @@ function wireSetupScreen() {
   const stepperSpecs = {
     rounds:     { cfgKey: 'numRounds',      min: 3,  max: 24,  valId: 'roundsVal' },
     targetScore:{ cfgKey: 'targetScore',     min: 20, max: 400, valId: 'targetScoreVal' },
-    multiplier: { cfgKey: 'scoreMultiplier', min: 1,  max: 6,   valId: 'multiplierVal' },
+    multiplier: { cfgKey: 'scoreMultiplier', min: 1,  max: 10,   valId: 'multiplierVal' },
   };
   document.querySelectorAll('[data-step]').forEach((btn) => {
     btn.onclick = () => {
