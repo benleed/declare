@@ -1751,16 +1751,16 @@ function renderScoreDrawerIfOpen() {
 /* ------------------------------ setup screen -------------------------------- */
 function wireSetupScreen() {
   const draftConfig = {
-    numPlayers: 4,
+    numPlayers: 3,
     kittyOpen: false,
-    firstLeader: 'declarer',
-    trumpBreaking: false,
+    firstLeader: 'left',
+    trumpBreaking: true,
     successScale: 'quadratic',
     failScale: 'triangular',
     successMultiplier: 1,
     failMultiplier: 1,
     defenderMode: 'always',
-    endMode: 'rounds',
+    endMode: 'score',
     numRounds: 8,
     targetScore: 100,
   };
@@ -1817,6 +1817,36 @@ function wireSetupScreen() {
   document.getElementById('startBtn').onclick = () => {
     startGame({ ...draftConfig });
   };
+
+  // Initialize UI to match draftConfig
+  document.querySelectorAll('.chip-row[data-group]').forEach((row) => {
+    const group = row.dataset.group;
+    const value = draftConfig[group];
+    row.querySelectorAll('.chip').forEach((chip) => {
+      const chipValue = isNaN(Number(chip.dataset.value)) ? chip.dataset.value : Number(chip.dataset.value);
+      chip.classList.toggle('active', chipValue === value);
+    });
+  });
+
+  document.querySelectorAll('.switch[data-key]').forEach((sw) => {
+    const key = sw.dataset.key;
+    sw.classList.toggle('on', draftConfig[key]);
+  });
+
+  document.querySelectorAll('[data-step]').forEach((btn) => {
+    const spec = stepperSpecs[btn.dataset.step];
+    if (spec) document.getElementById(spec.valId).textContent = draftConfig[spec.cfgKey];
+  });
+
+  const twoPlayerNote = document.getElementById('twoPlayerNote');
+  if (twoPlayerNote) twoPlayerNote.style.display = draftConfig.numPlayers === 2 ? 'block' : 'none';
+
+  const roundsField = document.querySelector('[data-show="rounds"]');
+  const scoreField = document.querySelector('[data-show="score"]');
+  if (roundsField && scoreField) {
+    roundsField.style.display = draftConfig.endMode === 'rounds' ? '' : 'none';
+    scoreField.style.display = draftConfig.endMode === 'score' ? '' : 'none';
+  }
 }
 
 /* --------------------------------- init ------------------------------------ */
