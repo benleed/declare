@@ -502,7 +502,7 @@ button:focus-visible, .selectable:focus-visible{
   content:'discard'; position:absolute; bottom:2px; left:0; right:0; text-align:center;
   font-size:8px; color: var(--danger); font-weight:800; letter-spacing:.05em; text-transform:uppercase;
 }
-.mini-card.from-kitty{ box-shadow: 0 0 0 4px var(--brass-bright), 0 0 10px rgba(236,207,128,.55); }
+.mini-card.from-kitty{ box-shadow: 0 0 0 2px var(--brass-bright), 0 0 10px rgba(236,207,128,.55); }
 .mini-card .r{ font-weight:800; font-size:13px; font-family: var(--font-display); }
 .mini-card .s{ width:14px; height:14px; align-self:center; }
 
@@ -567,7 +567,9 @@ button:focus-visible, .selectable:focus-visible{
           <button class="chip" data-value="3">3 players</button>
           <button class="chip active" data-value="4">4 players</button>
         </div>
-        <div style="margin-top:8px;font-size:12px;color:var(--ivory-dim);">Kitty is 3 cards for 2–3 players, 4 cards for 4 players.</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--ivory-dim);">Kitty is 3 cards for 2–3 players, 4 cards for 4 players.
+          <button class="btn-ghost" id="botRosterBtn" style="border:none;background:none;text-decoration:underline;padding:0;font-size:12px;cursor:pointer;color:var(--brass-bright);">View bot roster</button>
+        </div>
       </div>
 
       <div class="field-group">
@@ -578,6 +580,21 @@ button:focus-visible, .selectable:focus-visible{
             <div class="d">Kitty cards are dealt face-up for everyone to see.</div>
           </div>
           <div class="switch" data-key="kittyOpen"></div>
+        </div>
+        <div class="option-row">
+          <div class="option-text">
+            <div class="t">Trump must be broken to lead it</div>
+            <div class="d">Can't lead the trump suit until it's been played in an earlier trick.</div>
+          </div>
+          <div class="switch" data-key="trumpBreaking"></div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="group-label">First lead of the round</label>
+        <div class="chip-row" data-group="firstLeader">
+          <button class="chip active" data-value="declarer">Declarer leads</button>
+          <button class="chip" data-value="left">Left of declarer</button>
         </div>
       </div>
 
@@ -600,12 +617,18 @@ button:focus-visible, .selectable:focus-visible{
       </div>
 
       <div class="field-group">
-        <label class="group-label">Score multiplier</label>
+        <label class="group-label">Score multipliers</label>
+        <div class="num-input" style="margin-bottom:8px;">
+          <button data-step="madeMult" data-delta="-1">−</button>
+          <span class="val" id="madeMultVal">1</span>
+          <button data-step="madeMult" data-delta="1">+</button>
+          <span style="color:var(--ivory-dim);font-size:12.5px;margin-left:8px;">× when contract is made</span>
+        </div>
         <div class="num-input">
-          <button data-step="multiplier" data-delta="-1">−</button>
-          <span class="val" id="multiplierVal">1</span>
-          <button data-step="multiplier" data-delta="1">+</button>
-          <span style="color:var(--ivory-dim);font-size:12.5px;margin-left:8px;">× applied to both made and failed contracts</span>
+          <button data-step="failMult" data-delta="-1">−</button>
+          <span class="val" id="failMultVal">1</span>
+          <button data-step="failMult" data-delta="1">+</button>
+          <span style="color:var(--ivory-dim);font-size:12.5px;margin-left:8px;">× when contract fails</span>
         </div>
       </div>
 
@@ -738,6 +761,44 @@ function suitName(id) { return SUIT_BY_ID[id].name; }
 
 const ALL_CARDS = buildDeck();
 
+/* ---------------------------- Bot personalities ---------------------------- */
+const BOT_POOL = [
+  { name: 'Old Man Fitz',  tag: 'Timid',      aggression: 0.78 },
+  { name: 'Marlowe',       tag: 'Cautious',   aggression: 0.88 },
+  { name: 'Steady Sam',    tag: 'Steady',     aggression: 0.96 },
+  { name: 'Odette',        tag: 'Balanced',   aggression: 1.04 },
+  { name: 'Prof. Byte',    tag: 'Calculated', aggression: 1.10 },
+  { name: 'Judge',         tag: 'Confident',  aggression: 1.16 },
+  { name: 'Countess Vale', tag: 'Bold',       aggression: 1.24 },
+  { name: 'Reckless Rhea', tag: 'Reckless',   aggression: 1.34 },
+];
+function buildBotRosterHTML(highlightActive) {
+  const activeNames = highlightActive ? new Set(game.players.filter((p) => !p.isHuman).map((p) => p.name)) : new Set();
+  let html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">';
+  for (const b of BOT_POOL) {
+    const active = activeNames.has(b.name);
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border:1px solid ${active ? 'var(--brass-bright)' : 'var(--brass-dim)'};border-radius:8px;${active ? 'background:rgba(236,207,128,.12);' : ''}">
+      <span style="font-weight:700;font-size:13.5px;">${b.name}${active ? ' <span style="color:var(--brass-bright);font-size:10px;text-transform:uppercase;letter-spacing:.05em;">in this game</span>' : ''}</span>
+      <span style="font-size:12px;color:var(--ivory-dim);">${b.tag} · ×${b.aggression.toFixed(2)}</span>
+    </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+function showInfoModal(title, bodyHTML) {
+  const overlay = el('div', 'modal-overlay');
+  const modal = el('div', 'modal');
+  modal.appendChild(el('h2', null, title));
+  modal.appendChild(el('div', null, bodyHTML));
+  const actions = el('div', 'modal-actions');
+  const btn = el('button', 'btn btn-brass', 'Close');
+  btn.onclick = () => overlay.remove();
+  actions.appendChild(btn);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  document.getElementById('app').appendChild(overlay);
+}
+
 /* ------------------------ 3. Tiny reactivity store ---------------------- */
 const Store = {
   listeners: [],
@@ -757,6 +818,7 @@ const game = {
   discardPile: [],
   deckUnused: [],
   trumpSuit: null,
+  trumpBroken: false,
   declarerIndex: null,
   contractBid: null,
   currentTrick: { leaderIndex: null, leadSuit: null, plays: [] },
@@ -765,8 +827,8 @@ const game = {
   activePlayer: null,
   activeBidder: null,
   humanLegalIds: null,
-  humanBidContext: null,
   log: [],
+  scoreHistory: [],
   gameOver: false,
 };
 
@@ -797,6 +859,11 @@ const DISCARD_POS = { x: 22, y: 16 };
 function computeHandSlot(idx, count, anchor, isHuman) {
   const t = idx - (count - 1) / 2;
   if (isHuman) {
+    const smallScreen = typeof window !== 'undefined' && window.innerWidth <= 720;
+    if (smallScreen) {
+      const flatSpacing = clamp(64 / Math.max(count, 1), 4.2, 9);
+      return { x: 50 + t * flatSpacing, y: 89, rot: 0, faceUp: true };
+    }
     const spacing = clamp(34 / Math.max(count, 1), 2.6, 4.6);
     return { x: 50 + t * spacing, y: 84 + t * t * 0.4, rot: t * 3.6, faceUp: true };
   }
@@ -1030,23 +1097,7 @@ function renderSeats() {
 
 function renderActionBar() {
   actionbarEl.innerHTML = '';
-  if (game.phase === 'auction' && game.humanBidContext) {
-    const { highBid, forced } = game.humanBidContext;
-    const prompt = el('div', 'prompt');
-    prompt.appendChild(el('div', 'prompt-title', forced ? 'You must open the bidding' : 'Your bid'));
-    const row = el('div', 'prompt-row');
-    for (let amt = highBid + 1; amt <= TRICKS_PER_ROUND; amt++) {
-      const b = el('button', 'btn btn-sm' + (amt === highBid + 1 ? ' btn-brass' : ''), String(amt));
-      b.onclick = () => submitBid({ type: 'bid', amount: amt });
-      row.appendChild(b);
-    }
-    const passBtn = el('button', 'btn btn-sm btn-ghost', 'Pass');
-    passBtn.disabled = forced;
-    passBtn.onclick = () => submitBid({ type: 'pass' });
-    row.appendChild(passBtn);
-    prompt.appendChild(row);
-    actionbarEl.appendChild(prompt);
-  } else if (game.phase === 'playing' && game.activePlayer === 0 && game.humanLegalIds) {
+  if (game.phase === 'playing' && game.activePlayer === 0 && game.humanLegalIds) {
     const prompt = el('div', 'prompt');
     const lead = game.currentTrick.plays.length === 0;
     prompt.appendChild(el('div', 'prompt-title', lead ? 'Lead a card' : 'Follow suit — play a card'));
@@ -1104,7 +1155,9 @@ function estimateHandStrength(cards, trumpSuit) {
 
 function aiDecideBid(player, highBid, forced) {
   const trumpGuess = bestTrumpSuitFor(player.hand);
-  const est = estimateHandStrength(player.hand, trumpGuess) * rand(0.88, 1.12);
+  const kittyBonus = kittySize(game.players.length) * 0.42;
+  const aggression = player.aggression || 1;
+  const est = (estimateHandStrength(player.hand, trumpGuess) + kittyBonus) * aggression * rand(0.94, 1.16);
   const target = clamp(Math.round(est), forced ? 1 : 0, TRICKS_PER_ROUND);
   if (forced) {
     return { type: 'bid', amount: clamp(target, 1, TRICKS_PER_ROUND) };
@@ -1146,8 +1199,12 @@ function cardPower(card, leadSuit, trumpSuit) {
   if (card.suit === leadSuit) return 100 + card.rankIndex;
   return card.rankIndex;
 }
-function getLegalMoves(hand, trick, trumpSuit) {
-  if (!trick.plays.length) return hand.slice();
+function getLegalMoves(hand, trick, trumpSuit, trumpBroken, breakingEnabled) {
+  if (!trick.plays.length) {
+    if (!breakingEnabled || trumpBroken) return hand.slice();
+    const nonTrump = hand.filter((c) => c.suit !== trumpSuit);
+    return nonTrump.length ? nonTrump : hand.slice();
+  }
   const leadSuit = trick.leadSuit;
   const followers = hand.filter((c) => c.suit === leadSuit);
   return followers.length ? followers : hand.slice();
@@ -1178,7 +1235,7 @@ function chooseLead(hand, trumpSuit) {
 
 function aiChooseCard(player, legal) {
   const trick = game.currentTrick;
-  if (!trick.plays.length) return chooseLead(player.hand, game.trumpSuit);
+  if (!trick.plays.length) return chooseLead(legal, game.trumpSuit);
   const winning = trick.plays.reduce((best, p) =>
     cardPower(p.card, trick.leadSuit, game.trumpSuit) > cardPower(best.card, trick.leadSuit, game.trumpSuit) ? p : best,
     trick.plays[0]);
@@ -1192,22 +1249,32 @@ function aiChooseCard(player, legal) {
 }
 
 /* ------------------------- 9. Human-input promises ------------------------ */
-let pendingBidResolve = null;
 let pendingCardResolve = null;
 
-function waitForHumanBid(highBid, forced) {
-  return new Promise((res) => {
-    pendingBidResolve = res;
-    game.humanBidContext = { highBid, forced };
-    update();
-  });
+function renderBidModal(highBid, forced, onSubmit) {
+  const overlay = el('div', 'modal-overlay');
+  const modal = el('div', 'modal');
+  modal.appendChild(el('h2', null, forced ? 'You must open the bidding' : 'Your bid'));
+  modal.appendChild(el('div', 'sub', highBid > 0 ? `Current high bid is ${highBid}. Choose your bid, or pass.` : 'Choose your opening bid.'));
+  const row = el('div', 'prompt-row');
+  row.style.display = 'flex'; row.style.flexWrap = 'wrap'; row.style.gap = '8px'; row.style.justifyContent = 'center'; row.style.margin = '16px 0 4px';
+  for (let amt = highBid + 1; amt <= TRICKS_PER_ROUND; amt++) {
+    const b = el('button', 'btn btn-sm' + (amt === highBid + 1 ? ' btn-brass' : ''), String(amt));
+    b.onclick = () => { overlay.remove(); onSubmit({ type: 'bid', amount: amt }); };
+    row.appendChild(b);
+  }
+  modal.appendChild(row);
+  const actions = el('div', 'modal-actions');
+  const passBtn = el('button', 'btn btn-ghost', 'Pass');
+  passBtn.disabled = forced;
+  passBtn.onclick = () => { overlay.remove(); onSubmit({ type: 'pass' }); };
+  actions.appendChild(passBtn);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  document.getElementById('app').appendChild(overlay);
 }
-function submitBid(action) {
-  if (!pendingBidResolve) return;
-  const resolve = pendingBidResolve;
-  pendingBidResolve = null;
-  game.humanBidContext = null;
-  resolve(action);
+function waitForHumanBid(highBid, forced) {
+  return new Promise((res) => { renderBidModal(highBid, forced, res); });
 }
 function waitForHumanCardPlay(legal) {
   return new Promise((res) => {
@@ -1221,17 +1288,19 @@ function waitForHumanCardPlay(legal) {
 function playerName(i) { return game.players[i].name; }
 
 function buildPlayers(config) {
-  const names = ['You', 'Marlowe', 'Odette', 'Judge'];
-  const players = [];
-  for (let i = 0; i < config.numPlayers; i++) {
+  const bots = shuffled(BOT_POOL).slice(0, config.numPlayers - 1);
+  const players = [{
+    index: 0, name: 'You', isHuman: true,
+    hand: [], tricksWonCount: 0, score: 0, auctionBubble: null,
+  }];
+  for (let i = 0; i < bots.length; i++) {
     players.push({
-      index: i,
-      name: i === 0 ? 'You' : names[i],
-      isHuman: i === 0,
-      hand: [],
-      tricksWonCount: 0,
-      score: 0,
-      auctionBubble: null,
+      index: i + 1,
+      name: bots[i].name,
+      isHuman: false,
+      aggression: bots[i].aggression,
+      tag: bots[i].tag,
+      hand: [], tricksWonCount: 0, score: 0, auctionBubble: null,
     });
   }
   return players;
@@ -1247,6 +1316,7 @@ function resetRoundState() {
   game.discardPile = [];
   game.deckUnused = [];
   game.trumpSuit = null;
+  game.trumpBroken = false;
   game.declarerIndex = null;
   game.contractBid = null;
   game.currentTrick = { leaderIndex: null, leadSuit: null, plays: [] };
@@ -1255,7 +1325,6 @@ function resetRoundState() {
   game.activePlayer = null;
   game.activeBidder = null;
   game.humanLegalIds = null;
-  game.humanBidContext = null;
 }
 
 async function animateDeal() {
@@ -1415,7 +1484,7 @@ async function kittyExchangePhase() {
 async function playAllTricks() {
   game.phase = 'playing';
   const n = game.players.length;
-  let leader = game.declarerIndex;
+  let leader = game.config.firstLeader === 'left' ? (game.declarerIndex + 1) % n : game.declarerIndex;
   for (let t = 0; t < TRICKS_PER_ROUND; t++) {
     game.trickNumber = t + 1;
     game.currentTrick = { leaderIndex: leader, leadSuit: null, plays: [] };
@@ -1425,7 +1494,7 @@ async function playAllTricks() {
       const playerIndex = (leader + step) % n;
       const player = game.players[playerIndex];
       game.activePlayer = playerIndex;
-      const legal = getLegalMoves(player.hand, game.currentTrick, game.trumpSuit);
+      const legal = getLegalMoves(player.hand, game.currentTrick, game.trumpSuit, game.trumpBroken, game.config.trumpBreaking);
       update();
       let card;
       if (player.isHuman) {
@@ -1436,6 +1505,7 @@ async function playAllTricks() {
       }
       player.hand = player.hand.filter((c) => c.id !== card.id);
       if (!game.currentTrick.plays.length) game.currentTrick.leadSuit = card.suit;
+      if (card.suit === game.trumpSuit) game.trumpBroken = true;
       game.currentTrick.plays.push({ playerIndex, card });
       logEvent(`${player.name} plays ${cardLabel(card)}.`);
       update();
@@ -1460,12 +1530,13 @@ function computeRoundScoring() {
   const bid = game.players.length == 2 ? game.contractBid - 2 : game.contractBid;
   const tricksWon = declarer.tricksWonCount;
   const made = tricksWon >= bid;
-  const mult = game.config.scoreMultiplier || 1;
+  const madeMult = game.config.successMultiplier || 1;
+  const failMult = game.config.failMultiplier || 1;
   let declarerScore;
   if (made) {
-    declarerScore = mult * scaleValue(game.config.successScale, bid) + (tricksWon - bid);
+    declarerScore = madeMult * scaleValue(game.config.successScale, bid) + (tricksWon - bid);
   } else {
-    declarerScore = -mult * scaleValue(game.config.failScale, bid);
+    declarerScore = -failMult * scaleValue(game.config.failScale, bid);
   }
   const perPlayer = game.players.map((p, i) => {
     let delta;
@@ -1514,6 +1585,29 @@ function showRoundSummary(results) {
   });
 }
 
+function buildScoreHistoryTableHTML() {
+  if (!game.scoreHistory.length) {
+    return '<div style="font-size:12.5px;color:var(--ivory-dim);padding:6px 0;">No rounds completed yet.</div>';
+  }
+  const n = game.players.length;
+  let html = '<div style="overflow-x:auto;"><table class="result-table" style="min-width:100%;"><thead><tr><th>Rnd</th>';
+  for (let i = 0; i < n; i++) html += `<th>${game.players[i].name}</th>`;
+  html += '</tr></thead><tbody>';
+  for (const r of game.scoreHistory) {
+    html += `<tr><td>${r.round}</td>`;
+    for (let i = 0; i < n; i++) {
+      const pr = r.perPlayer.find((p) => p.playerIndex === i);
+      const delta = pr ? pr.delta : 0;
+      const cls = delta > 0 ? 'pos' : delta < 0 ? 'neg' : '';
+      const decl = i === r.declarerIndex ? '<span style="color:var(--brass-bright);">★</span>' : '';
+      html += `<td class="num ${cls}">${delta > 0 ? '+' : ''}${delta}${decl}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div><div style="font-size:11px;color:var(--ivory-dim);margin-top:4px;">★ = declarer that round</div>';
+  return html;
+}
+
 function checkEndCondition() {
   if (game.config.endMode === 'rounds') return game.round >= game.config.numRounds;
   return game.players.some((p) => p.score >= game.config.targetScore);
@@ -1536,6 +1630,11 @@ function showGameOverModal() {
     });
     table.appendChild(tbody);
     modal.appendChild(table);
+    const historyHeader = el('h3', null, 'Round by round');
+    historyHeader.style.color = 'var(--brass-bright)';
+    historyHeader.style.fontFamily = 'var(--font-display)';
+    modal.appendChild(historyHeader);
+    modal.appendChild(el('div', null, buildScoreHistoryTableHTML()));
     const actions = el('div', 'modal-actions');
     const btn = el('button', 'btn btn-brass', 'New Game');
     btn.onclick = () => { overlay.remove(); res(); };
@@ -1561,6 +1660,13 @@ async function playRound() {
   await playAllTricks();
   const results = computeRoundScoring();
   applyScores(results);
+  game.scoreHistory.push({
+    round: game.round,
+    declarerIndex: game.declarerIndex,
+    bid: game.contractBid,
+    made: results.made,
+    perPlayer: results.perPlayer.map((r) => ({ playerIndex: r.playerIndex, delta: r.delta })),
+  });
   update();
   await sleep(300);
   await showRoundSummary(results);
@@ -1578,6 +1684,7 @@ async function startGame(config) {
   game.round = 1;
   game.gameOver = false;
   game.log = [];
+  game.scoreHistory = [];
   buildSeatsOnce(config.numPlayers);
   buildCardNodesOnce();
   buildTableMarkersOnce();
@@ -1622,12 +1729,20 @@ function renderScoreDrawerIfOpen() {
   const lines = [
     `Players: ${cfg.numPlayers}`,
     `Kitty: ${cfg.kittyOpen ? 'Open' : 'Concealed'} (${kittySize(cfg.numPlayers)} cards)`,
-    `Success scale: ${cfg.successScale} × ${cfg.scoreMultiplier || 1}`,
-    `Failure scale: ${cfg.failScale} × ${cfg.scoreMultiplier || 1}`,
+    `First lead: ${cfg.firstLeader === 'left' ? "Declarer's left" : 'Declarer'}`,
+    `Trump breaking: ${cfg.trumpBreaking ? 'Required' : 'Not required'}`,
+    `Success scale: ${cfg.successScale} × ${cfg.successMultiplier || 1}`,
+    `Failure scale: ${cfg.failScale} × ${cfg.failMultiplier || 1}`,
     `Defenders: ${cfg.defenderMode === 'always' ? 'Always score' : cfg.defenderMode === 'none' ? 'Never score' : 'Score on declarer fail'}`,
   ];
   const rulesDiv = el('div', null, lines.map((l) => `<div style="font-size:12.5px;color:var(--ivory-dim);padding:4px 0;">${l}</div>`).join(''));
   drawer.appendChild(rulesDiv);
+
+  drawer.appendChild(el('h3', null, 'Round by round'));
+  drawer.appendChild(el('div', null, buildScoreHistoryTableHTML()));
+
+  drawer.appendChild(el('h3', null, 'Bot roster'));
+  drawer.appendChild(el('div', null, buildBotRosterHTML(true)));
 }
 
 /* ------------------------------ setup screen -------------------------------- */
@@ -1635,9 +1750,12 @@ function wireSetupScreen() {
   const draftConfig = {
     numPlayers: 4,
     kittyOpen: false,
+    firstLeader: 'declarer',
+    trumpBreaking: false,
     successScale: 'quadratic',
     failScale: 'triangular',
-    scoreMultiplier: 1,
+    successMultiplier: 1,
+    failMultiplier: 1,
     defenderMode: 'always',
     endMode: 'rounds',
     numRounds: 8,
@@ -1671,9 +1789,10 @@ function wireSetupScreen() {
   });
 
   const stepperSpecs = {
-    rounds:     { cfgKey: 'numRounds',      min: 3,  max: 24,  valId: 'roundsVal' },
-    targetScore:{ cfgKey: 'targetScore',     min: 20, max: 400, valId: 'targetScoreVal' },
-    multiplier: { cfgKey: 'scoreMultiplier', min: 1,  max: 10,   valId: 'multiplierVal' },
+    rounds:      { cfgKey: 'numRounds',        min: 3,  max: 24,  valId: 'roundsVal' },
+    targetScore: { cfgKey: 'targetScore',       min: 20, max: 400, valId: 'targetScoreVal' },
+    madeMult:    { cfgKey: 'successMultiplier', min: 1,  max: 10,  valId: 'madeMultVal' },
+    failMult:    { cfgKey: 'failMultiplier',    min: 1,  max: 10,  valId: 'failMultVal' },
   };
   document.querySelectorAll('[data-step]').forEach((btn) => {
     btn.onclick = () => {
@@ -1684,6 +1803,9 @@ function wireSetupScreen() {
       document.getElementById(spec.valId).textContent = draftConfig[spec.cfgKey];
     };
   });
+
+  const rosterBtn = document.getElementById('botRosterBtn');
+  if (rosterBtn) rosterBtn.onclick = () => showInfoModal('Bot Roster', buildBotRosterHTML(false));
 
   document.getElementById('startBtn').onclick = () => {
     startGame({ ...draftConfig });
@@ -1708,6 +1830,8 @@ function initDom() {
   };
 
   wireSetupScreen();
+
+  window.addEventListener('resize', () => { if (game.screen === 'table') update(); });
 }
 
 document.addEventListener('DOMContentLoaded', initDom);
