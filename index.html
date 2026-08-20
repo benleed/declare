@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/png" href="favicon.png">
 <title>Declare — a bidding trick-taking game</title>
 <style>
 
@@ -823,7 +824,6 @@ const BOT_POOL = [
   { name: 'Reckless Rhea', tag: 'Reckless',   aggression: 1.34 },
   { name: 'Mad Molly',     tag: 'Mad',        aggression: 1.60 },
   { name: 'Lunatic Liam',     tag: 'Lunatic',        aggression: 2 },
-  { name: 'Demon Dan',     tag: 'Demon',        aggression: 4 },
 ];
 function buildBotRosterHTML(highlightActive) {
   const activeNames = highlightActive ? new Set(game.players.filter((p) => !p.isHuman).map((p) => p.name)) : new Set();
@@ -2026,9 +2026,9 @@ function wireSetupScreen() {
     firstLeader: 'left',
     trumpBreaking: true,
     successScale: 'triangular',
-    failScale: 'linear',
+    failScale: 'triangular',
     successMultiplier: 1,
-    failMultiplier: 2,
+    failMultiplier: 1,
     defenderMode: 'always',
     endMode: 'rounds',
     numRounds: 8,
