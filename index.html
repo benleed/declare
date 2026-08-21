@@ -814,16 +814,12 @@ const ALL_CARDS = buildDeck();
 
 /* ---------------------------- Bot personalities ---------------------------- */
 const BOT_POOL = [
-  { name: 'Old Man Fitz',  tag: 'Timid',      aggression: 0.78 },
-  { name: 'Marlowe',       tag: 'Cautious',   aggression: 0.88 },
   { name: 'Steady Sam',    tag: 'Steady',     aggression: 0.96 },
-  { name: 'Odette',        tag: 'Balanced',   aggression: 1.04 },
-  { name: 'Prof. Byte',    tag: 'Calculated', aggression: 1.10 },
   { name: 'Judge',         tag: 'Confident',  aggression: 1.16 },
   { name: 'Countess Vale', tag: 'Bold',       aggression: 1.24 },
   { name: 'Reckless Rhea', tag: 'Reckless',   aggression: 1.34 },
   { name: 'Mad Molly',     tag: 'Mad',        aggression: 1.60 },
-  { name: 'Lunatic Liam',     tag: 'Lunatic',        aggression: 2 },
+  { name: 'Lunatic Liam',  tag: 'Lunatic',    aggression: 2 },
 ];
 function buildBotRosterHTML(highlightActive) {
   const activeNames = highlightActive ? new Set(game.players.filter((p) => !p.isHuman).map((p) => p.name)) : new Set();
