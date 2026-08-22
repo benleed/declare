@@ -963,7 +963,7 @@ function computeCardTarget(card) {
       const pileOff = Math.min(game.players[trick.winnerIndex].tricksWonCount, 6) * 0.35;
       const x = a.x + (TABLE_CENTER.x - a.x) * 0.22 + pileOff;
       const y = a.y + (TABLE_CENTER.y - a.y) * 0.22 + pileOff;
-      return { x, y, rot: 8, z: 2, faceUp: false };
+      return { x, y, rot: 8, z: 1, opacity: 0.25, faceUp: false };
     }
   }
   for (let i = 0; i < n; i++) {
@@ -986,7 +986,7 @@ function layoutAllCards() {
     cardEl.style.top = t.y + '%';
     cardEl.style.transform = `rotate(${t.rot}deg) scale(${t.scale || 1})`;
     cardEl.style.zIndex = String(t.z);
-    cardEl.style.opacity = t.hide ? '0' : '1';
+    cardEl.style.opacity = t.hide ? '0' : (t.opacity !== undefined ? String(t.opacity) : '1');
     cardEl.classList.toggle('face-down', !t.faceUp);
 
     const isHumanHand = game.players[0] && game.players[0].hand.some((c) => c.id === card.id);
