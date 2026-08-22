@@ -277,6 +277,8 @@ button:focus-visible, .selectable:focus-visible{
   z-index: 10;
   transform: translate(-50%,-50%);
 }
+.seat.seat-side-west{ transform: translate(0,-50%); }
+.seat.seat-side-east{ transform: translate(-100%,-50%); }
 .seat-info{
   display:flex; align-items:center; gap:6px;
 }
@@ -389,6 +391,8 @@ button:focus-visible, .selectable:focus-visible{
   .pip-corner .rank{ font-size:11px; }
   .pip-corner{ width:14px; }
   .pip-corner .suit-icon{ width:9px; height:9px; }
+  .seat .plate{ flex-direction: column; align-items: flex-start; gap: 1px; white-space: normal; padding: 2px 6px; font-size: 10px; }
+  .seat .plate .role{ font-size: 7.5px; }
 }
 
 /* deck + kitty pile markers on table */
@@ -696,7 +700,7 @@ button:focus-visible, .selectable:focus-visible{
       <div class="field-group">
         <label class="group-label">Games to simulate</label>
         <div class="num-input">
-          <button data-mcstep="mcGames" data-delta="-5">−</button>
+          <button data-mcstep="mcGames" data-delta="-50">−</button>
           <span class="val" id="mcGamesVal">500</span>
           <button data-mcstep="mcGames" data-delta="50">+</button>
           <span style="color:var(--ivory-dim);font-size:12.5px;margin-left:8px;">games</span>
@@ -817,7 +821,7 @@ const BOT_POOL = [
   { name: 'Steady Sam',    tag: 'Steady',     aggression: 0.96 },
   { name: 'Judge',         tag: 'Confident',  aggression: 1.16 },
   { name: 'Countess Vale', tag: 'Bold',       aggression: 1.24 },
-  { name: 'Reckless Rhea', tag: 'Reckless',   aggression: 1.34 },
+  { name: 'Rowdy Rhea',    tag: 'Reckless',   aggression: 1.34 },
   { name: 'Mad Molly',     tag: 'Mad',        aggression: 1.60 },
   { name: 'Lunatic Liam',  tag: 'Lunatic',    aggression: 2 },
 ];
@@ -907,19 +911,20 @@ const DISCARD_POS = { x: 22, y: 16 };
 
 function computeHandSlot(idx, count, anchor, isHuman) {
   const t = idx - (count - 1) / 2;
+  const smallScreen = typeof window !== 'undefined' && window.innerWidth <= 720;
   if (isHuman) {
-    const smallScreen = typeof window !== 'undefined' && window.innerWidth <= 720;
     if (smallScreen) {
       const flatSpacing = clamp(64 / Math.max(count, 1), 4.2, 9);
-      return { x: 50 + t * flatSpacing, y: 89, rot: 0, faceUp: true };
+      return { x: 50 + t * flatSpacing, y: 89, rot: 0, faceUp: true, scale: 1 };
     }
     const spacing = clamp(34 / Math.max(count, 1), 2.6, 4.6);
-    return { x: 50 + t * spacing, y: 84 + t * t * 0.4, rot: t * 3.6, faceUp: true };
+    return { x: 50 + t * spacing, y: 84 + t * t * 0.4, rot: t * 3.6, faceUp: true, scale: 1 };
   }
   const dx = (50 - anchor.x) * 0.5;
   const dy = (50 - anchor.y) * 0.5;
-  const spacing = clamp(9 / Math.max(count, 1), 0.9, 1.7);
-  return { x: anchor.x + dx + t * spacing, y: anchor.y + dy + Math.abs(t) * 0.2, rot: t * 4, faceUp: false };
+  const scale = smallScreen ? 0.68 : 1;
+  const spacing = clamp(9 / Math.max(count, 1), 0.9, 1.7) * (smallScreen ? 0.75 : 1);
+  return { x: anchor.x + dx + t * spacing, y: anchor.y + dy + Math.abs(t) * 0.2, rot: 0, faceUp: false, scale };
 }
 
 function computeCardTarget(card) {
@@ -931,7 +936,7 @@ function computeCardTarget(card) {
   }
   const kIdx = game.kitty.findIndex((c) => c.id === card.id);
   if (kIdx >= 0) {
-    return { x: KITTY_POS.x + kIdx * 0.9, y: KITTY_POS.y + kIdx * 0.9, rot: kIdx * 3 - 5, z: 5 + kIdx, faceUp: !!game.config.kittyOpen };
+    return { x: KITTY_POS.x + kIdx * 0.5, y: KITTY_POS.y + kIdx * 0.5, rot: kIdx * 3 - 5, z: 5 + kIdx, faceUp: !!game.config.kittyOpen };
   }
   const dIdx = game.discardPile.findIndex((c) => c.id === card.id);
   if (dIdx >= 0) {
@@ -979,7 +984,7 @@ function layoutAllCards() {
     if (!cardEl) continue;
     cardEl.style.left = t.x + '%';
     cardEl.style.top = t.y + '%';
-    cardEl.style.transform = `rotate(${t.rot}deg)`;
+    cardEl.style.transform = `rotate(${t.rot}deg) scale(${t.scale || 1})`;
     cardEl.style.zIndex = String(t.z);
     cardEl.style.opacity = t.hide ? '0' : '1';
     cardEl.classList.toggle('face-down', !t.faceUp);
@@ -1047,12 +1052,28 @@ function buildSeatsOnce(n) {
   const anchors = seatAnchorsFor(n);
   for (let i = 0; i < n; i++) {
     const a = anchors[i];
-    const dx = (a.x - TABLE_CENTER.x) * 0.14;
-    const dy = (a.y - TABLE_CENTER.y) * 0.14;
+    let labelX, labelY;
+    const smallScreen = typeof window !== 'undefined' && window.innerWidth <= 720;
+    if (i === 0) {
+      // Human: label sits above the hand (toward table center), never behind the cards.
+      labelX = 50;
+      labelY = 75;
+    } else {
+      // AI seats: anchor to that seat's actual hand-center (where cards get pulled to),
+      // then sit above it. This tracks the real card position rather than a fixed push
+      // factor, so it can't drift into edge-clipping on narrow screens or overlap the fan.
+      // Desktop cards render full-size while mobile AI cards are scaled down (~0.68x),
+      // so desktop needs a bigger offset for the same visual clearance.
+      const handCenterX = a.x + (TABLE_CENTER.x - a.x) * 0.5;
+      const handCenterY = a.y + (TABLE_CENTER.y - a.y) * 0.5;
+      const yOffset = smallScreen ? 11 : 14;
+      labelX = clamp(handCenterX, 12, 88);
+      labelY = clamp(handCenterY - yOffset, 7, 91);
+    }
     const orientation = Math.abs(a.x - 50) < 5 ? 'seat-ns' : 'seat-ew';
     const s = el('div', 'seat ' + orientation);
-    s.style.left = clamp(a.x + dx, 6, 94) + '%';
-    s.style.top = clamp(a.y + dy, 6, 94) + '%';
+    s.style.left = labelX + '%';
+    s.style.top = labelY + '%';
     s.innerHTML = `
       <div class="seat-info">
         <div class="plate">
@@ -1887,7 +1908,7 @@ function buildMonteCarloResultsHTML(stats, numGames) {
 
 /* ------------------------------ Monte Carlo screen -------------------------- */
 function wireMonteCarloScreen(getRuleConfig) {
-  const selected = new Set(['Old Man Fitz', 'Judge', 'Mad Molly']);
+  const selected = new Set(['Steady Same', 'Coutess Vale', 'Mad Molly']);
   let numGames = 500;
 
   const botRow = document.getElementById('mcBotRow');
